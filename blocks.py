@@ -1,5 +1,6 @@
 import torch
 from torch import nn
+import math
 
 training = True
 
@@ -12,7 +13,6 @@ class Postional_Encoding(nn.Module):
     def __init__(self, encoding_size:int):
         super().__init__()
         self.d_model = encoding_size
-        nn.ModuleList([self.d_model])
     
     def forward(self, pos_max:int, x):
         pos_tensor = torch.arange(0, pos_max, 1, dtype=torch.float32, device=device)
@@ -27,6 +27,7 @@ class Postional_Encoding(nn.Module):
 
 class InputBlock(nn.Module):
     def __init__(self, vocabulary_size:int, embedding_size:int):
+        super().__init__()
         self.embedding_layer = nn.Embedding(vocabulary_size, embedding_size)
         self.positional_encoding = Postional_Encoding(embedding_size)
         nn.ModuleList([self.embedding_layer, self.positional_encoding])
@@ -36,3 +37,26 @@ class InputBlock(nn.Module):
         out = self.embedding_layer(x)
         out = self.positional_encoding(pos_max, out)
         return out
+
+class SelfAttention(nn.Module):
+    def __init__(self, input_size:int, output_size:int):
+        super().__init__()
+        self.query = nn.Linear(input_size, output_size)
+        self.key = nn.Linear(input_size, output_size)
+        self.value = nn.Linear(input_size, output_size)
+        self.softmax = nn.Softmax(-1)
+
+        nn.ModuleList([self.query, self.key, self.value, self.softmax])
+    
+    def forward(self, x):
+        query = self.query(x)
+        key = self.key(x)
+        value = self.value(x)
+
+        key_T = key.transpose(1, 2)
+        intermidiate = torch.matmul(query, key_T)/math.sqrt(key.shape[-1])
+        weights = self.softmax(intermidiate)
+
+        contextual_embedding = torch.matmul(weights, value)
+
+        return contextual_embedding
