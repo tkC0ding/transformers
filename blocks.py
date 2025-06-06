@@ -38,7 +38,7 @@ class InputBlock(nn.Module):
         out = self.positional_encoding(pos_max, out)
         return out
 
-class SelfAttention(nn.Module):
+class SelfAttentionHead(nn.Module):
     def __init__(self, input_size:int, output_size:int):
         super().__init__()
         self.query = nn.Linear(input_size, output_size)
@@ -60,3 +60,17 @@ class SelfAttention(nn.Module):
         contextual_embedding = torch.matmul(weights, value)
 
         return contextual_embedding
+
+class MultiHeadAttentionBlock(nn.Module):
+    def __init__(self, input_size:int, output_size:int, num_heads:int):
+        super().__init__()
+        self.heads = nn.ModuleList([SelfAttentionHead(input_size, output_size) for _ in range(num_heads)])
+        self.W0 = nn.Linear(output_size*num_heads, input_size)
+
+        nn.ModuleList([self.heads])
+    
+    def forward(self, x):
+        outputs = [layer(x) for layer in self.heads]
+        out = torch.cat(outputs, -1)
+        final_embeddings = self.W0(out)
+        return final_embeddings
