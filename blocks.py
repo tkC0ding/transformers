@@ -101,3 +101,19 @@ class FeedForwardBlock(nn.Module):
         out = self.layer_1(x)
         out = self.layer_2(out)
         return out
+
+class EncoderBlock(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.multiheadattention = MultiHeadAttentionBlock(512, 64, 8)
+        self.add_norm = AddandNorm(512)
+        self.feedforward = FeedForwardBlock(512, 2048)
+
+        nn.ModuleList([self.multiheadattention, self.add_norm, self.feedforward])
+    
+    def forward(self, x):
+        multi_out = self.multiheadattention(x)
+        add_norm_out_1 = self.add_norm(x, multi_out)
+        feed_forward_out = self.feedforward(add_norm_out_1)
+        add_norm_out_2 = self.add_norm(add_norm_out_1, feed_forward_out)
+        return add_norm_out_2
