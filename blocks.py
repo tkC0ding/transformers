@@ -176,6 +176,8 @@ class CrossAttention(nn.Module):
         self.key = nn.Linear(encoder_output_dim, output_dim)
         self.query = nn.Linear(masked_attention_dim, output_dim)
         self.softmax = nn.Softmax(-1)
+
+        nn.ModuleList([self.value, self.key, self.query, self.softmax])
     
     def forward(self, encoder_output:torch.Tensor, x:torch.Tensor):
         query = self.query(x)
@@ -193,6 +195,8 @@ class MultiHeadCrossAttention(nn.Module):
         super().__init__()
         self.blocks = nn.ModuleList([CrossAttention(encoder_output_dim, output_dim, masked_attention_dim) for _ in range(num_heads)])
         self.W0 = nn.Linear(output_dim*num_heads, masked_attention_dim)
+
+        nn.ModuleList([self.blocks, self.W0])
     
     def forward(self, encoder_output:torch.Tensor, x:torch.Tensor):
         outputs = [block(encoder_output, x) for block in self.blocks]
@@ -207,6 +211,8 @@ class DecoderBlock(nn.Module):
         self.AddandNorm = AddandNorm(masked_input_dim)
         self.MultiHeadCrossAttention = MultiHeadCrossAttention(encoder_output_dim, cross_attention_output_dim, masked_input_dim, num_cross_attention_heads)
         self.feedforward = FeedForwardBlock(masked_input_dim, feed_forward_dim)
+
+        nn.ModuleList([self.MultiHeadMaskedAttention, self.AddandNorm, self.MultiHeadCrossAttention, self.feedforward])
     
     def forward(self, x, encoder_output):
         masked_output = self.MultiHeadMaskedAttention(x)
@@ -217,5 +223,17 @@ class DecoderBlock(nn.Module):
 
         feedforward = self.feedforward(add_norm_2)
         add_norm_3 = self.AddandNorm(add_norm_2, feedforward)
-        
+
         return add_norm_3
+
+class Decoder(nn.Module):
+    def __init__(self, masked_input_dim:int, masked_output_dim:int, num_masked_heads:int, encoder_output_dim:int, cross_attention_output_dim:int, num_cross_attention_heads:int, feed_forward_dim:int, num_blocks:int):
+        super().__init__()
+        self.decoder_block_heads = nn.ModuleList([DecoderBlock(masked_input_dim, masked_output_dim, num_masked_heads, encoder_output_dim, cross_attention_output_dim, num_cross_attention_heads, feed_forward_dim) for _ in range(num_blocks)])
+
+        nn.ModuleList([self.decoder_block_heads])
+    
+    def forward(self, x, encoder_output):
+        for block in self.decoder_block_heads:
+            x = block(x, encoder_output)
+        return x
