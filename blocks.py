@@ -67,7 +67,7 @@ class MultiHeadAttentionBlock(nn.Module):
         self.heads = nn.ModuleList([SelfAttentionHead(input_size, output_size) for _ in range(num_heads)])
         self.W0 = nn.Linear(output_size*num_heads, input_size)
 
-        nn.ModuleList([self.heads])
+        nn.ModuleList([self.heads, self.W0])
     
     def forward(self, x):
         outputs = [layer(x) for layer in self.heads]
@@ -79,10 +79,25 @@ class AddandNorm(nn.Module):
     def __init__(self, input_dim:int):
         super().__init__()
         self.layer_norm = nn.LayerNorm(normalized_shape=input_dim)
+
+        nn.ModuleList([self.layer_norm])
     
     def forward(self, previous_x, new_x):
         out = previous_x + new_x
         out = torch.reshape(out, (out.shape[0]*out.shape[1], out.shape[-1]))
         out = self.layer_norm(out)
         out = torch.reshape(out, previous_x.shape)
+        return out
+
+class FeedForwardBlock(nn.Module):
+    def __init__(self, input_dim:int, hidden_dim:int):
+        super().__init__()
+        self.layer_1 = nn.Linear(input_dim, hidden_dim)
+        self.layer_2 = nn.Linear(hidden_dim, input_dim)
+
+        nn.ModuleList([self.layer_1, self.layer_2])
+    
+    def forward(self, x):
+        out = self.layer_1(x)
+        out = self.layer_2(out)
         return out
