@@ -93,21 +93,23 @@ class FeedForwardBlock(nn.Module):
     def __init__(self, input_dim:int, hidden_dim:int):
         super().__init__()
         self.layer_1 = nn.Linear(input_dim, hidden_dim)
+        self.ReLU = nn.ReLU()
         self.layer_2 = nn.Linear(hidden_dim, input_dim)
 
-        nn.ModuleList([self.layer_1, self.layer_2])
+        nn.ModuleList([self.layer_1, self.layer_2, self.ReLU])
     
     def forward(self, x):
         out = self.layer_1(x)
+        out = self.ReLU(out)
         out = self.layer_2(out)
         return out
 
 class EncoderBlock(nn.Module):
-    def __init__(self):
+    def __init__(self, input_dim):
         super().__init__()
-        self.multiheadattention = MultiHeadAttentionBlock(512, 64, 8)
-        self.add_norm = AddandNorm(512)
-        self.feedforward = FeedForwardBlock(512, 2048)
+        self.multiheadattention = MultiHeadAttentionBlock(input_dim, 64, 8)
+        self.add_norm = AddandNorm(input_dim)
+        self.feedforward = FeedForwardBlock(input_dim, 2048)
 
         nn.ModuleList([self.multiheadattention, self.add_norm, self.feedforward])
     
@@ -117,3 +119,15 @@ class EncoderBlock(nn.Module):
         feed_forward_out = self.feedforward(add_norm_out_1)
         add_norm_out_2 = self.add_norm(add_norm_out_1, feed_forward_out)
         return add_norm_out_2
+
+class Encoder(nn.Module):
+    def __init__(self, input_dim, num_blocks):
+        super().__init__()
+        self.encoder_block_heads = nn.ModuleList([EncoderBlock(input_dim) for _ in range(num_blocks)])
+        
+        nn.ModuleList([self.encoder_block_heads])
+    
+    def forward(self, x):
+        for block in self.encoder_block_heads:
+            x = block(x)
+        return x
