@@ -133,33 +133,32 @@ class Encoder(nn.Module):
         return x
 
 class MaskedSelfAttention(nn.Module):
-    def __init__(self, input_dim:int, output_dim:int, mask:torch.Tensor):
+    def __init__(self, input_dim:int, output_dim:int):
         super().__init__()
         self.query = nn.Linear(input_dim, output_dim)
         self.key = nn.Linear(input_dim, output_dim)
         self.value = nn.Linear(input_dim, output_dim)
         self.softmax = nn.Softmax(-1)
-        self.mask = mask
 
         nn.ModuleList([self.query, self.key, self.value, self.softmax])
     
-    def forward(self, x):
+    def forward(self, x, mask):
         query = self.query(x)
         key = self.key(x)
         value = self.value(x)
         key_T = key.transpose(1, 2)
 
         intermidiate_1 = torch.matmul(query, key_T)/math.sqrt(key.shape[-1])
-        intermidiate_2 = intermidiate_1 + self.mask
+        intermidiate_2 = intermidiate_1 + mask
         intermidiate_3 = self.softmax(intermidiate_2)
         out = torch.matmul(intermidiate_3, value)
 
         return out
 
 class MultiHeadMaskedAttention(nn.Module):
-    def __init__(self, input_dim:int, output_dim:int, mask:torch.Tensor, num_heads:int):
+    def __init__(self, input_dim:int, output_dim:int, num_heads:int):
         super().__init__()
-        self.heads = nn.ModuleList([MaskedSelfAttention(input_dim, output_dim, mask) for _ in range(num_heads)])
+        self.heads = nn.ModuleList([MaskedSelfAttention(input_dim, output_dim) for _ in range(num_heads)])
         self.W0 = nn.Linear(output_dim*num_heads, input_dim)
 
         nn.ModuleList([self.heads])
@@ -200,3 +199,23 @@ class MultiHeadCrossAttention(nn.Module):
         out = torch.cat(outputs, -1)
         out = self.W0(out)
         return out
+
+class DecoderBlock(nn.Module):
+    def __init__(self, masked_input_dim:int, masked_output_dim:int, num_masked_heads:int, encoder_output_dim:int, cross_attention_output_dim:int, num_cross_attention_heads:int, feed_forward_dim:int):
+        super().__init__()
+        self.MultiHeadMaskedAttention = MultiHeadMaskedAttention(masked_input_dim, masked_output_dim, num_masked_heads)
+        self.AddandNorm = AddandNorm(masked_input_dim)
+        self.MultiHeadCrossAttention = MultiHeadCrossAttention(encoder_output_dim, cross_attention_output_dim, masked_input_dim, num_cross_attention_heads)
+        self.feedforward = FeedForwardBlock(masked_input_dim, feed_forward_dim)
+    
+    def forward(self, x, encoder_output):
+        masked_output = self.MultiHeadMaskedAttention(x)
+        add_norm_1 = self.AddandNorm(x, masked_output)
+
+        cross_output = self.MultiHeadCrossAttention(encoder_output, add_norm_1)
+        add_norm_2 = self.AddandNorm(add_norm_1, cross_output)
+
+        feedforward = self.feedforward(add_norm_2)
+        add_norm_3 = self.AddandNorm(add_norm_2, feedforward)
+        
+        return add_norm_3
