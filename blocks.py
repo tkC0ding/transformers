@@ -105,11 +105,11 @@ class FeedForwardBlock(nn.Module):
         return out
 
 class EncoderBlock(nn.Module):
-    def __init__(self, input_dim):
+    def __init__(self, input_dim:int, num_attention_heads:int, attention_out_dim:int, feedforward_hiiden_dim:int):
         super().__init__()
-        self.multiheadattention = MultiHeadAttentionBlock(input_dim, 64, 8)
+        self.multiheadattention = MultiHeadAttentionBlock(input_dim, attention_out_dim, num_attention_heads)
         self.add_norm = AddandNorm(input_dim)
-        self.feedforward = FeedForwardBlock(input_dim, 2048)
+        self.feedforward = FeedForwardBlock(input_dim, feedforward_hiiden_dim)
 
         nn.ModuleList([self.multiheadattention, self.add_norm, self.feedforward])
     
@@ -121,9 +121,9 @@ class EncoderBlock(nn.Module):
         return add_norm_out_2
 
 class Encoder(nn.Module):
-    def __init__(self, input_dim, num_blocks):
+    def __init__(self, input_dim:int, num_blocks:int, num_attention_heads:int, attention_out_dim:int, feedforward_hidden_dim:int):
         super().__init__()
-        self.encoder_block_heads = nn.ModuleList([EncoderBlock(input_dim) for _ in range(num_blocks)])
+        self.encoder_block_heads = nn.ModuleList([EncoderBlock(input_dim, num_attention_heads, attention_out_dim, feedforward_hidden_dim) for _ in range(num_blocks)])
         
         nn.ModuleList([self.encoder_block_heads])
     
