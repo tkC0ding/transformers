@@ -160,7 +160,7 @@ class MultiHeadMaskedAttention(nn.Module):
     def __init__(self, input_dim:int, output_dim:int, mask:torch.Tensor, num_heads:int):
         super().__init__()
         self.heads = nn.ModuleList([MaskedSelfAttention(input_dim, output_dim, mask) for _ in range(num_heads)])
-        self.W0 = nn.Linear(input_dim*num_heads, input_dim)
+        self.W0 = nn.Linear(output_dim*num_heads, input_dim)
 
         nn.ModuleList([self.heads])
     
@@ -170,3 +170,33 @@ class MultiHeadMaskedAttention(nn.Module):
         out = self.W0(out)
         return out
 
+class CrossAttention(nn.Module):
+    def __init__(self, encoder_output_dim:int, output_dim:int, masked_attention_dim:int):
+        super().__init__()
+        self.value = nn.Linear(encoder_output_dim, output_dim)
+        self.key = nn.Linear(encoder_output_dim, output_dim)
+        self.query = nn.Linear(masked_attention_dim, output_dim)
+        self.softmax = nn.Softmax(-1)
+    
+    def forward(self, encoder_output:torch.Tensor, x:torch.Tensor):
+        query = self.query(x)
+        key = self.key(encoder_output)
+        value = self.value(encoder_output)
+
+        key_T = key.transpose(1, 2)
+        intermidiate_1 = torch.matmul(query, key_T)/math.sqrt(key.shape[-1])
+        intermidiate_2 = self.softmax(intermidiate_1)
+        out = torch.matmul(intermidiate_2, value)
+        return out
+
+class MultiHeadCrossAttention(nn.Module):
+    def __init__(self, encoder_output_dim:int, output_dim:int, masked_attention_dim:int, num_heads:int):
+        super().__init__()
+        self.blocks = nn.ModuleList([CrossAttention(encoder_output_dim, output_dim, masked_attention_dim) for _ in range(num_heads)])
+        self.W0 = nn.Linear(output_dim*num_heads, masked_attention_dim)
+    
+    def forward(self, encoder_output:torch.Tensor, x:torch.Tensor):
+        outputs = [block(encoder_output, x) for block in self.blocks]
+        out = torch.cat(outputs, -1)
+        out = self.W0(out)
+        return out
