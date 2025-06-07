@@ -74,3 +74,15 @@ class MultiHeadAttentionBlock(nn.Module):
         out = torch.cat(outputs, -1)
         final_embeddings = self.W0(out)
         return final_embeddings
+
+class AddandNorm(nn.Module):
+    def __init__(self, input_dim:int):
+        super().__init__()
+        self.layer_norm = nn.LayerNorm(normalized_shape=input_dim)
+    
+    def forward(self, previous_x, new_x):
+        out = previous_x + new_x
+        out = torch.reshape(out, (out.shape[0]*out.shape[1], out.shape[-1]))
+        out = self.layer_norm(out)
+        out = torch.reshape(out, previous_x.shape)
+        return out
