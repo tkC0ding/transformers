@@ -237,3 +237,17 @@ class Decoder(nn.Module):
         for block in self.decoder_block_heads:
             x = block(x, encoder_output)
         return x
+    
+class OutputBlock(nn.Module):
+    def __init__(self, input_dim, vocab_size):
+        super().__init__()
+        self.linear = nn.Linear(input_dim, vocab_size)
+        self.softmax = nn.Softmax(-1)
+
+        nn.ModuleList([self.linear, self.softmax])
+    
+    def forward(self, x):
+        out = self.linear(x)
+        out = self.softmax(out)
+        return out
+
